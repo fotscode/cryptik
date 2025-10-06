@@ -1,0 +1,13 @@
+---
+const { src, height, loading, title } = Astro.props;
+const finalHeight = height || 560;
+const finalLoading = loading || "lazy";
+const finalTitle = title || "General iframe";
+---
+<iframe 
+    style=`position: relative; height: ${finalHeight}px`
+    width="100%"
+    title={finalTitle}
+    loading={finalLoading}
+    src={src}>
+</iframe>

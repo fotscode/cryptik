@@ -1,0 +1,94 @@
+---
+import { Badge, Icon } from '@astrojs/starlight/components'
+const rateMap = {
+    r:'recommended',
+    a:'alternative',
+    o:'optional'
+}
+
+const BASE_URL = import.meta.env.BASE_URL
+
+const bibMap = {
+    // === books ===
+    book: { badge: 'Libro', title: 'Book Example (Author 1; Author 2) [Inglés]', url: BASE_URL, target: '_blank' },
+
+    // === videos ===
+    video: { badge: 'Video', title: 'Video example (Author) [Inglés]', url: BASE_URL, target: '_blank' },
+
+   // === Papers ===
+    paper: { badge: 'Paper', title: 'Paper example (Author) [Inglés]', url: BASE_URL, target: '_blank' },
+
+    // === others === 
+    others: { badge: 'Otros', title: 'Other example (Author) [Inglés]', url: BASE_URL, target: '_blank' },
+
+    // === ours/wiki ===
+    wiki: { badge: 'Wiki', title: 'Wiki example (Cryptik) [Español]', url: `${BASE_URL}`, target: '_self' },
+}
+type BibItemType = keyof typeof bibMap
+type RateType = keyof typeof rateMap
+type AstroProps = {
+    id: BibItemType;
+    rate: RateType;
+    prefix?: string
+}
+const { id, rate, prefix = '' } = Astro.props as AstroProps
+const colorClass = rateMap[rate];
+const { title, badge, url, target } = bibMap[id]
+---
+<style>
+.Video, .Libro, .Wiki, .Paper, .Otros {
+    min-width: 55px;
+    text-align: center;
+}
+.Libro {
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-white);
+}
+.Video {
+    background: var(--sl-color-accent);
+    color: white;
+}
+.Wiki {
+    background: var(--sl-color-accent-high);
+    color: var(--sl-color-accent-low);
+}
+.Paper {
+    background: var(--sl-color-gray-2);
+    border: 1px solid var(--sl-color-gray-5);
+    color: var(--sl-color-black);
+}
+.Otros {
+    background: var(--sl-color-gray-5);
+    border: 1px solid var(--sl-color-gray-2);
+    color: var(--sl-color-white);
+}
+a {
+    text-decoration: none;
+}
+.flex-center{
+      display:flex;
+      justify-content:start;
+      align-items:center;
+      gap: 0.5rem;
+}
+.recommended, .alternative, .optional {
+    border-radius:50%;
+    min-width:fit-content;
+}
+.recommended {
+    background: #874EFE;
+}
+.alternative {
+    background: #4F7A28;
+}
+.optional {
+    background: #929292;
+}
+</style>
+
+
+<div class="flex-center">
+    <Icon name="approve-check" class={colorClass} color="white" />
+    <Badge text={badge} class={badge} />
+    <div>{prefix}<a href={url} target={target}>{title}</a></div>
+</div>

@@ -1,0 +1,43 @@
+---
+title: 'Cryptik: Explora la Blockchain'
+description: Todo lo que necesitas para entender y dominar la blockchain. Desde los fundamentos hasta algoritmos avanzados.
+head:
+  - tag: meta
+    attrs:
+      { property: 'og:image', content: /cryptik/favicon.svg }
+  - tag: meta
+    attrs:
+      { property: 'og:image:alt', content: 'Logo de Cryptik, con la letra C representando una red descentralizada' }
+template: splash
+hero:
+  title: Explora la Blockchain con Cryptik
+  tagline: Todo lo que necesitas para entender y dominar la blockchain. Desde los fundamentos hasta algoritmos avanzados.
+  image:
+    file: /public/favicon.svg
+  actions:
+    - text: Comenzar
+      icon: right-arrow
+      link: /cryptik/introduction/first-steps/
+    - text: Participa colaborativamente en GitHub
+      icon: external
+      variant: minimal
+      link: https://github.com/fotscode/cryptik
+      attrs:
+        target: _blank
+---
+import { CardGrid, Card } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+	<Card title="Guía de estudio" icon="open-book">
+        Cryptik acerca la blockchain a estudiantes, investigadores y entusiastas, proporcionando una forma autodidacta de aprender, con una hoja de ruta que actúa como guía.
+	</Card>
+	<Card title="Una idea, varias perspectivas" icon="puzzle">
+        Experimenta los conceptos de blockchain en diversos enfoques, sin cambiar de pestaña.
+	</Card>
+    <Card title="Bibliografía unificada" icon="document">
+    	Accede a una selección curada de recursos clave, organizados y recomendados segun su relavancia incluyendo: artículos, libros, cursos y enlaces útiles.
+    </Card>
+	<Card title="Esfuerzo colaborativo" icon="rocket">
+        El contenido de esta enciclopedia es de código abierto, lo que permite su evolución continua a través de contribuciones de la comunidad.
+	</Card>
+</CardGrid>
