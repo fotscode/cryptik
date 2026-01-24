@@ -1,0 +1,625 @@
+---
+---
+
+<div class="curve-container">
+  <div class="curve-header">
+    <h3 class="curve-title">Curva secp256k1</h3>
+    <p class="curve-description">
+      Visualización de la curva elíptica secp256k1 utilizada por Bitcoin.
+    </p>
+  </div>
+  <div class="curve-canvas-wrapper">
+    <canvas id="curve-canvas" class="curve-canvas"></canvas>
+  </div>
+  <div class="curve-controls">
+    <button id="generate-points-btn" class="generate-btn">Generar Puntos P y Q</button>
+    <div id="points-info" class="key-info" style="display: none;">
+      <div class="key-item">
+        <span class="key-label">P:</span>
+        <span id="point-p" class="key-value"></span>
+      </div>
+      <div class="key-item">
+        <span class="key-label">Q:</span>
+        <span id="point-q" class="key-value"></span>
+      </div>
+      <div class="key-item">
+        <span class="key-label">R = P + Q:</span>
+        <span id="point-r" class="key-value"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let pointP: { x: number; y: number } | null = null;
+  let pointQ: { x: number; y: number } | null = null;
+  let pointR: { x: number; y: number } | null = null;
+  let pointNegR: { x: number; y: number } | null = null;
+
+  function drawCurve() {
+    const canvas = document.getElementById('curve-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    const container = canvas.parentElement;
+    if (container) {
+      const width = container.clientWidth;
+      canvas.width = width;
+      canvas.height = Math.min(600, width * 0.75);
+    }
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 40;
+    const plotWidth = width - 2 * padding;
+    const plotHeight = height - 2 * padding;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Set styles
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const axisColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+    const curveColor = getComputedStyle(document.documentElement).getPropertyValue('--sl-color-accent').trim() || '#5e6ad2';
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--sl-color-text').trim() || (isDark ? '#fff' : '#000');
+
+    // Draw grid
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (i / 10) * plotWidth;
+      const y = padding + (i / 10) * plotHeight;
+      ctx.beginPath();
+      ctx.moveTo(x, padding);
+      ctx.lineTo(x, height - padding);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(width - padding, y);
+      ctx.stroke();
+    }
+
+    // Draw axes
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = 2;
+    const centerX = padding + plotWidth / 2;
+    const centerY = padding + plotHeight / 2;
+    
+    // X axis
+    ctx.beginPath();
+    ctx.moveTo(padding, centerY);
+    ctx.lineTo(width - padding, centerY);
+    ctx.stroke();
+    
+    // Y axis
+    ctx.beginPath();
+    ctx.moveTo(centerX, padding);
+    ctx.lineTo(centerX, height - padding);
+    ctx.stroke();
+
+    // Coordinate system: map from mathematical coordinates to canvas
+    // We'll show a range from -5 to 5 for x, and adjust y accordingly
+    const xMin = -5;
+    const xMax = 5;
+    const scaleX = plotWidth / (xMax - xMin);
+    const scaleY = plotHeight / 10; // Show y from -5 to 5
+
+    function mathToCanvasX(x: number): number {
+      return centerX + x * scaleX;
+    }
+
+    function mathToCanvasY(y: number): number {
+      return centerY - y * scaleY; // Invert y-axis
+    }
+
+    function canvasToMathX(canvasX: number): number {
+      return (canvasX - centerX) / scaleX;
+    }
+
+    function canvasToMathY(canvasY: number): number {
+      return (centerY - canvasY) / scaleY;
+    }
+
+    // Draw the curve y² = x³ + 7
+    // For each x, we have y = ±√(x³ + 7)
+    // The curve exists where x³ + 7 ≥ 0, i.e., x ≥ -∛7 ≈ -1.913
+    ctx.strokeStyle = curveColor;
+    ctx.lineWidth = 3;
+    
+    const step = 0.005; // Smaller step for smoother curve
+    const curveStartX = -Math.cbrt(7); // Approximately -1.913
+    const startX = Math.max(xMin, curveStartX);
+    
+    // Calculate the meeting point where both branches connect (y = 0)
+    const meetingPointX = mathToCanvasX(curveStartX);
+    const meetingPointY = mathToCanvasY(0);
+    
+    // Draw upper branch (positive y) - starting from meeting point, going right
+    ctx.beginPath();
+    ctx.moveTo(meetingPointX, meetingPointY); // Start at the meeting point
+    for (let x = startX; x <= xMax; x += step) {
+      const ySquared = x * x * x + 7;
+      if (ySquared >= 0) {
+        const y = Math.sqrt(ySquared);
+        const canvasX = mathToCanvasX(x);
+        const canvasY = mathToCanvasY(y);
+        ctx.lineTo(canvasX, canvasY);
+      }
+    }
+    ctx.stroke();
+
+    // Draw lower branch (negative y) - starting from meeting point, going right
+    ctx.beginPath();
+    ctx.moveTo(meetingPointX, meetingPointY); // Start at the meeting point
+    for (let x = startX; x <= xMax; x += step) {
+      const ySquared = x * x * x + 7;
+      if (ySquared >= 0) {
+        const y = -Math.sqrt(ySquared);
+        const canvasX = mathToCanvasX(x);
+        const canvasY = mathToCanvasY(y);
+        ctx.lineTo(canvasX, canvasY);
+      }
+    }
+    ctx.stroke();
+
+    // Draw point addition visualization if points are selected
+    if (pointP && pointQ && pointR && pointNegR) {
+      const pX = pointP.x;
+      const pY = pointP.y;
+      const qX = pointQ.x;
+      const qY = pointQ.y;
+      const rX = pointR.x;
+      const rY = pointR.y;
+      const negRX = pointNegR.x;
+      const negRY = pointNegR.y;
+
+      const pCanvasX = mathToCanvasX(pX);
+      const pCanvasY = mathToCanvasY(pY);
+      const qCanvasX = mathToCanvasX(qX);
+      const qCanvasY = mathToCanvasY(qY);
+      const rCanvasX = mathToCanvasX(rX);
+      const rCanvasY = mathToCanvasY(rY);
+      const negRCanvasX = mathToCanvasX(negRX);
+      const negRCanvasY = mathToCanvasY(negRY);
+
+      // Calculate line through P and Q
+      let slope: number;
+      let intercept: number;
+      
+      if (Math.abs(pX - qX) < 0.001) {
+        // Points are the same or very close - use tangent line
+        slope = (3 * pX * pX) / (2 * pY);
+        intercept = pY - slope * pX;
+      } else {
+        // Regular secant line
+        slope = (qY - pY) / (qX - pX);
+        intercept = pY - slope * pX;
+      }
+
+      // Draw secant line through P, Q, and -R
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      
+      // Extend line well beyond canvas bounds
+      const lineLength = Math.max(plotWidth, plotHeight) * 2;
+      const x1 = Math.min(pX, qX, negRX) - 2;
+      const x2 = Math.max(pX, qX, negRX) + 2;
+      const y1 = slope * x1 + intercept;
+      const y2 = slope * x2 + intercept;
+      
+      ctx.moveTo(mathToCanvasX(x1), mathToCanvasY(y1));
+      ctx.lineTo(mathToCanvasX(x2), mathToCanvasY(y2));
+      ctx.stroke();
+
+      // Draw vertical line from -R to R
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(negRCanvasX, negRCanvasY);
+      ctx.lineTo(rCanvasX, rCanvasY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw point P
+      ctx.fillStyle = '#4a90e2';
+      ctx.beginPath();
+      ctx.arc(pCanvasX, pCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label P
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('P', pCanvasX + 12, pCanvasY - 8);
+
+      // Draw point Q
+      ctx.fillStyle = '#4a90e2';
+      ctx.beginPath();
+      ctx.arc(qCanvasX, qCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label Q
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Q', qCanvasX + 12, qCanvasY - 8);
+
+      // Draw point -R
+      ctx.fillStyle = '#4a90e2';
+      ctx.beginPath();
+      ctx.arc(negRCanvasX, negRCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label -R
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('-R', negRCanvasX + 12, negRCanvasY - 8);
+
+      // Draw point R
+      ctx.fillStyle = '#4a90e2';
+      ctx.beginPath();
+      ctx.arc(rCanvasX, rCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label R
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('R = P + Q', rCanvasX + 12, rCanvasY + 8);
+    }
+  }
+
+  // Find third intersection point of line with curve
+  function findThirdIntersection(x1: number, y1: number, x2: number, y2: number): { x: number; y: number } | null {
+    // Line equation: y = mx + b
+    let m: number;
+    let b: number;
+    
+    if (Math.abs(x1 - x2) < 0.001) {
+      // Points are the same or very close - use tangent
+      m = (3 * x1 * x1) / (2 * y1);
+      b = y1 - m * x1;
+    } else {
+      m = (y2 - y1) / (x2 - x1);
+      b = y1 - m * x1;
+    }
+
+    // Substitute y = mx + b into y² = x³ + 7
+    // (mx + b)² = x³ + 7
+    // m²x² + 2mbx + b² = x³ + 7
+    // x³ - m²x² - 2mbx - (b² - 7) = 0
+    
+    // We know x1 and x2 are roots, so we can factor:
+    // (x - x1)(x - x2)(x - x3) = 0
+    // Expanding: x³ - (x1+x2+x3)x² + (x1x2 + x1x3 + x2x3)x - x1x2x3 = 0
+    
+    // Comparing coefficients:
+    // -(x1+x2+x3) = -m²  =>  x1+x2+x3 = m²  =>  x3 = m² - x1 - x2
+    
+    const x3 = m * m - x1 - x2;
+    const y3 = m * x3 + b;
+    
+    // Verify the point is on the curve
+    const y3Squared = y3 * y3;
+    const x3CubedPlus7 = x3 * x3 * x3 + 7;
+    
+    if (Math.abs(y3Squared - x3CubedPlus7) > 0.1) {
+      return null;
+    }
+    
+    return { x: x3, y: y3 };
+  }
+
+  function generatePoints() {
+    // Canvas visible range: x from -5 to 5, y from -5 to 5
+    const yMin = -5;
+    const yMax = 5;
+    const xMinVisible = -5;
+    const xMaxVisible = 5;
+    const curveStartX = -Math.cbrt(7); // Approximately -1.913
+    
+    // Calculate max x where |y| ≤ 5
+    // y² = x³ + 7 ≤ 25, so x³ ≤ 18, so x ≤ ∛18 ≈ 2.62
+    const xMax = Math.cbrt(18); // Approximately 2.62
+    const xMin = Math.max(curveStartX, -5);
+    
+    let bestP: { x: number; y: number } | null = null;
+    let bestQ: { x: number; y: number } | null = null;
+    let bestR: { x: number; y: number } | null = null;
+    let bestNegR: { x: number; y: number } | null = null;
+    let bestScore = Infinity;
+    
+    // Try multiple combinations to find one where R is also visible
+    for (let attempt = 0; attempt < 200; attempt++) {
+      // Generate point P within visible bounds
+      let x1 = xMin + Math.random() * (xMax - xMin);
+      const y1Squared = x1 * x1 * x1 + 7;
+      if (y1Squared < 0 || y1Squared > 25) continue;
+      
+      let y1 = Math.sqrt(y1Squared);
+      if (Math.random() < 0.5) y1 = -y1;
+      if (y1 < yMin || y1 > yMax) continue;
+      
+      // Generate point Q within visible bounds and different from P
+      let x2 = xMin + Math.random() * (xMax - xMin);
+      if (Math.abs(x1 - x2) < 0.5) continue;
+      
+      const y2Squared = x2 * x2 * x2 + 7;
+      if (y2Squared < 0 || y2Squared > 25) continue;
+      
+      let y2 = Math.sqrt(y2Squared);
+      if (Math.random() < 0.5) y2 = -y2;
+      if (y2 < yMin || y2 > yMax) continue;
+      
+      // Find third intersection point
+      const negR = findThirdIntersection(x1, y1, x2, y2);
+      if (!negR) continue;
+      
+      // R is the reflection of -R across x-axis
+      const rX = negR.x;
+      const rY = -negR.y;
+      
+      // Calculate how far R is from visible bounds (negative if inside, positive if outside)
+      const rXDist = Math.max(0, Math.max(xMinVisible - rX, rX - xMaxVisible));
+      const rYDist = Math.max(0, Math.max(yMin - rY, rY - yMax));
+      const score = rXDist + rYDist;
+      
+      // If R is within bounds, use it immediately
+      if (score === 0) {
+        pointP = { x: x1, y: y1 };
+        pointQ = { x: x2, y: y2 };
+        pointR = { x: rX, y: rY };
+        pointNegR = negR;
+        
+        // Update display
+        const pointPEl = document.getElementById('point-p');
+        const pointQEl = document.getElementById('point-q');
+        const pointREl = document.getElementById('point-r');
+        const pointsInfo = document.getElementById('points-info');
+        
+        if (pointPEl) {
+          pointPEl.textContent = `(${x1.toFixed(3)}, ${y1.toFixed(3)})`;
+        }
+        if (pointQEl) {
+          pointQEl.textContent = `(${x2.toFixed(3)}, ${y2.toFixed(3)})`;
+        }
+        if (pointREl) {
+          pointREl.textContent = `(${rX.toFixed(3)}, ${rY.toFixed(3)})`;
+        }
+        if (pointsInfo) {
+          pointsInfo.style.display = 'block';
+        }
+        
+        drawCurve();
+        return;
+      }
+      
+      // Keep track of the best (closest to bounds) combination
+      if (score < bestScore) {
+        bestScore = score;
+        bestP = { x: x1, y: y1 };
+        bestQ = { x: x2, y: y2 };
+        bestR = { x: rX, y: rY };
+        bestNegR = negR;
+      }
+    }
+    
+    // Use the best combination found
+    if (bestP && bestQ && bestR && bestNegR) {
+      pointP = bestP;
+      pointQ = bestQ;
+      pointR = bestR;
+      pointNegR = bestNegR;
+    } else {
+      // Fallback: generate simple P and Q
+      let x1 = xMin + Math.random() * (xMax - xMin);
+      const y1Squared = x1 * x1 * x1 + 7;
+      let y1 = Math.sqrt(y1Squared);
+      if (Math.random() < 0.5) y1 = -y1;
+      
+      let x2 = xMin + Math.random() * (xMax - xMin);
+      while (Math.abs(x1 - x2) < 0.5) {
+        x2 = xMin + Math.random() * (xMax - xMin);
+      }
+      const y2Squared = x2 * x2 * x2 + 7;
+      let y2 = Math.sqrt(y2Squared);
+      if (Math.random() < 0.5) y2 = -y2;
+      
+      pointP = { x: x1, y: y1 };
+      pointQ = { x: x2, y: y2 };
+      
+      const negR = findThirdIntersection(x1, y1, x2, y2);
+      if (negR) {
+        pointNegR = negR;
+        pointR = { x: negR.x, y: -negR.y };
+      } else {
+        pointNegR = null;
+        pointR = null;
+      }
+    }
+    
+    // Update display
+    const pointPEl = document.getElementById('point-p');
+    const pointQEl = document.getElementById('point-q');
+    const pointREl = document.getElementById('point-r');
+    const pointsInfo = document.getElementById('points-info');
+    
+    if (pointPEl && pointP) {
+      pointPEl.textContent = `(${pointP.x.toFixed(3)}, ${pointP.y.toFixed(3)})`;
+    }
+    if (pointQEl && pointQ) {
+      pointQEl.textContent = `(${pointQ.x.toFixed(3)}, ${pointQ.y.toFixed(3)})`;
+    }
+    if (pointREl && pointR) {
+      pointREl.textContent = `(${pointR.x.toFixed(3)}, ${pointR.y.toFixed(3)})`;
+    }
+    if (pointsInfo) {
+      pointsInfo.style.display = 'block';
+    }
+    
+    // Redraw curve with new points
+    drawCurve();
+  }
+
+  // Draw on load and resize
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      drawCurve();
+      const generateBtn = document.getElementById('generate-points-btn');
+      if (generateBtn) {
+        generateBtn.addEventListener('click', generatePoints);
+      }
+    });
+  } else {
+    drawCurve();
+    const generateBtn = document.getElementById('generate-points-btn');
+    if (generateBtn) {
+      generateBtn.addEventListener('click', generatePoints);
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    setTimeout(drawCurve, 100);
+  });
+
+  // Redraw on theme change
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawCurve);
+  }
+</script>
+
+<style>
+  .curve-container {
+    padding: 1.5rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-bg-inset);
+    margin: 1rem 0;
+  }
+
+  .curve-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .curve-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--sl-color-text);
+  }
+
+  .curve-description {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--sl-color-text);
+    opacity: 0.8;
+    line-height: 1.5;
+  }
+
+  .curve-canvas-wrapper {
+    width: 100%;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-bg);
+    padding: 0.5rem;
+    overflow: hidden;
+  }
+
+  .curve-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 600px;
+  }
+
+  .curve-controls {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .generate-btn {
+    padding: 0.75rem 1.5rem;
+    background-color: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+  }
+
+  .generate-btn:hover {
+    background-color: var(--sl-color-accent-high);
+    transform: translateY(-1px);
+  }
+
+  .generate-btn:active {
+    transform: translateY(0);
+  }
+
+  .key-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-bg);
+  }
+
+  .key-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .key-label {
+    font-weight: 500;
+    color: var(--sl-color-text);
+    font-size: 0.9rem;
+  }
+
+  .key-value {
+    font-family: var(--sl-font-mono);
+    color: var(--sl-color-text);
+    font-size: 0.9rem;
+    word-break: break-all;
+    padding: 0.5rem;
+    background-color: var(--sl-color-bg-inset);
+    border-radius: 0.25rem;
+  }
+
+  @media (min-width: 600px) {
+    .key-item {
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .key-label {
+      min-width: 180px;
+    }
+  }
+</style>
+

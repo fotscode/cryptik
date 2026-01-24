@@ -1,0 +1,52 @@
+---
+layout: '@layouts/math.astro'
+title: Bitcoin
+description: Bitcoin
+---
+import BibItem from '@components/BibItem.astro'
+import Recommendations from '@components/Recommendations.astro'
+import SHA256Hash from '@components/SHA256Hash.astro'
+import Secp256k1Curve from '@components/Secp256k1Curve.astro'
+
+### Hashing
+
+Bitcoin utiliza el algoritmo de hashing SHA-256 para asegurar la integridad de la cadena de bloques.
+
+Las funciones de hashing son claves ya que permiten verificar la integridad de los datos sin necesidad de conocer los datos originales. Esto se debe a que el hash es una función unidireccional, es decir, que no se puede obtener el mensaje original a partir del hash.
+
+<SHA256Hash />
+
+### Criptografía de clave pública
+
+Bitcoin utiliza la criptografía de clave pública (asimétrica) para asegurar la integridad de la cadena de bloques. Cada usuario tiene una clave pública y una clave privada. La clave pública se utiliza para verificar la integridad de los datos, mientras que la clave privada se utiliza para firmar los datos. 
+
+Especificamente, Bitcoin utiliza el algoritmo de firma digital ECDSA (Elliptic Curve Digital Signature Algorithm) para este proposito con el algoritmo de curva secp256k1.
+
+La ecuacion de la curva **secp256k1** es la siguiente:
+
+```math
+y^2 = x^3 + 7
+```
+
+La curva **secp256k1** es una curva elíptica definida sobre el campo finito $\mathbb{F}_p$, donde $p$ es el número primo que define el campo finito.
+
+```math
+p = 2^{256} - 2^{32} - 977
+```
+
+El orden de la curva **secp256k1** es el número de puntos en la curva.
+
+```math
+n = 115792089237316195423570985008687907852837564279074904382605163141518161494337
+```
+
+Esto significa que hay exactamente $n$ puntos en la curva **secp256k1**. Esto es fundamental para la seguridad del ECDSA ya que garantiza que las operaciones se realizan en un grupo de tamaño conocido y suficientemente grande.
+
+Una visualizacion de la curva **secp256k1** es la siguiente:
+
+<Secp256k1Curve />
+
+## Mas información
+
+<Recommendations />
+<BibItem id="bitcoin" rate="r" />

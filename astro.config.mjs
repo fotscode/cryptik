@@ -60,6 +60,18 @@ export default defineConfig({
                         },
                     ]
                 },
+                {
+                    label:'Monedas',
+                    translations: {
+                        en: 'Currencies',
+                    },
+                    items: [
+                        {
+                            label: 'Bitcoin',
+                            slug: 'currencies/bitcoin',
+                        },
+                    ]
+                }
             ],
             customCss: [ './src/styles/global.css' ]
         }),
