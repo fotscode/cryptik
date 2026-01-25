@@ -12,21 +12,8 @@
     <canvas id="curve-canvas" class="curve-canvas"></canvas>
   </div>
   <div class="curve-controls">
-    <button id="generate-points-btn" class="generate-btn">Generar Puntos P y Q</button>
-    <div id="points-info" class="key-info" style="display: none;">
-      <div class="key-item">
-        <span class="key-label">P:</span>
-        <span id="point-p" class="key-value"></span>
-      </div>
-      <div class="key-item">
-        <span class="key-label">Q:</span>
-        <span id="point-q" class="key-value"></span>
-      </div>
-      <div class="key-item">
-        <span class="key-label">R = P + Q:</span>
-        <span id="point-r" class="key-value"></span>
-      </div>
-    </div>
+    <button id="generate-points-btn" class="generate-btn">Ejemplo de suma de puntos</button>
+    <button id="generate-double-btn" class="generate-btn">Ejemplo de duplicación de punto</button>
   </div>
 </div>
 
@@ -35,6 +22,8 @@
   let pointQ: { x: number; y: number } | null = null;
   let pointR: { x: number; y: number } | null = null;
   let pointNegR: { x: number; y: number } | null = null;
+  let pointR2: { x: number; y: number } | null = null;
+  let pointNeg2R: { x: number; y: number } | null = null;
 
   function drawCurve() {
     const canvas = document.getElementById('curve-canvas') as HTMLCanvasElement;
@@ -286,6 +275,101 @@
       ctx.textAlign = 'left';
       ctx.fillText('R = P + Q', rCanvasX + 12, rCanvasY + 8);
     }
+
+    // Draw point doubling visualization (2R) if R and 2R are selected
+    if (pointR && pointR2 && pointNeg2R) {
+      const rX = pointR.x;
+      const rY = pointR.y;
+      const r2X = pointR2.x;
+      const r2Y = pointR2.y;
+      const neg2RX = pointNeg2R.x;
+      const neg2RY = pointNeg2R.y;
+
+      const rCanvasX = mathToCanvasX(rX);
+      const rCanvasY = mathToCanvasY(rY);
+      const r2CanvasX = mathToCanvasX(r2X);
+      const r2CanvasY = mathToCanvasY(r2Y);
+      const neg2RCanvasX = mathToCanvasX(neg2RX);
+      const neg2RCanvasY = mathToCanvasY(neg2RY);
+
+      // Calculate tangent line at R
+      // For y² = x³ + 7, derivative: 2y dy = 3x² dx
+      // Slope = dy/dx = (3x²)/(2y)
+      const slope = (3 * rX * rX) / (2 * rY);
+      const intercept = rY - slope * rX;
+
+      // Draw tangent line through R and -2R
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      
+      // Extend line well beyond canvas bounds
+      const x1 = Math.min(rX, neg2RX) - 2;
+      const x2 = Math.max(rX, neg2RX) + 2;
+      const y1 = slope * x1 + intercept;
+      const y2 = slope * x2 + intercept;
+      
+      ctx.moveTo(mathToCanvasX(x1), mathToCanvasY(y1));
+      ctx.lineTo(mathToCanvasX(x2), mathToCanvasY(y2));
+      ctx.stroke();
+
+      // Draw vertical line from -2R to 2R
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(neg2RCanvasX, neg2RCanvasY);
+      ctx.lineTo(r2CanvasX, r2CanvasY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw point R (for doubling operation)
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.arc(rCanvasX, rCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label R (only if not already labeled as P+Q)
+      if (!pointP || !pointQ) {
+        ctx.fillStyle = textColor;
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('R', rCanvasX + 12, rCanvasY - 8);
+      }
+
+      // Draw point -2R
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.arc(neg2RCanvasX, neg2RCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label -2R
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('-2R', neg2RCanvasX + 12, neg2RCanvasY - 8);
+
+      // Draw point 2R
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.arc(r2CanvasX, r2CanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label 2R
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('2R', r2CanvasX + 12, r2CanvasY + 8);
+    }
   }
 
   // Find third intersection point of line with curve
@@ -390,11 +474,14 @@
         pointR = { x: rX, y: rY };
         pointNegR = negR;
         
+        // Clear 2R visualization
+        pointR2 = null;
+        pointNeg2R = null;
+        
         // Update display
         const pointPEl = document.getElementById('point-p');
         const pointQEl = document.getElementById('point-q');
         const pointREl = document.getElementById('point-r');
-        const pointsInfo = document.getElementById('points-info');
         
         if (pointPEl) {
           pointPEl.textContent = `(${x1.toFixed(3)}, ${y1.toFixed(3)})`;
@@ -404,9 +491,6 @@
         }
         if (pointREl) {
           pointREl.textContent = `(${rX.toFixed(3)}, ${rY.toFixed(3)})`;
-        }
-        if (pointsInfo) {
-          pointsInfo.style.display = 'block';
         }
         
         drawCurve();
@@ -429,6 +513,10 @@
       pointQ = bestQ;
       pointR = bestR;
       pointNegR = bestNegR;
+      
+      // Clear 2R visualization
+      pointR2 = null;
+      pointNeg2R = null;
     } else {
       // Fallback: generate simple P and Q
       let x1 = xMin + Math.random() * (xMax - xMin);
@@ -455,13 +543,16 @@
         pointNegR = null;
         pointR = null;
       }
+      
+      // Clear 2R visualization
+      pointR2 = null;
+      pointNeg2R = null;
     }
     
     // Update display
     const pointPEl = document.getElementById('point-p');
     const pointQEl = document.getElementById('point-q');
     const pointREl = document.getElementById('point-r');
-    const pointsInfo = document.getElementById('points-info');
     
     if (pointPEl && pointP) {
       pointPEl.textContent = `(${pointP.x.toFixed(3)}, ${pointP.y.toFixed(3)})`;
@@ -472,8 +563,124 @@
     if (pointREl && pointR) {
       pointREl.textContent = `(${pointR.x.toFixed(3)}, ${pointR.y.toFixed(3)})`;
     }
-    if (pointsInfo) {
-      pointsInfo.style.display = 'block';
+    
+    // Redraw curve with new points
+    drawCurve();
+  }
+
+  function generateDouble() {
+    // Canvas visible range: x from -5 to 5, y from -5 to 5
+    const yMin = -5;
+    const yMax = 5;
+    const xMinVisible = -5;
+    const xMaxVisible = 5;
+    const curveStartX = -Math.cbrt(7); // Approximately -1.913
+    
+    // Calculate max x where |y| ≤ 5
+    const xMax = Math.cbrt(18); // Approximately 2.62
+    const xMin = Math.max(curveStartX, -5);
+    
+    let bestR: { x: number; y: number } | null = null;
+    let bestR2: { x: number; y: number } | null = null;
+    let bestNeg2R: { x: number; y: number } | null = null;
+    let bestScore = Infinity;
+    
+    // Try multiple points R to find one where 2R is also visible
+    for (let attempt = 0; attempt < 200; attempt++) {
+      // Generate point R within visible bounds
+      let rX = xMin + Math.random() * (xMax - xMin);
+      const rYSquared = rX * rX * rX + 7;
+      if (rYSquared < 0 || rYSquared > 25) continue;
+      
+      let rY = Math.sqrt(rYSquared);
+      if (Math.random() < 0.5) rY = -rY;
+      if (rY < yMin || rY > yMax) continue;
+      
+      // Avoid points where tangent is vertical (y = 0)
+      if (Math.abs(rY) < 0.1) continue;
+      
+      // Find 2R using tangent at R
+      // Tangent line: y = mx + b where m = (3x²)/(2y)
+      const slope = (3 * rX * rX) / (2 * rY);
+      const intercept = rY - slope * rX;
+      
+      // Find third intersection (tangent case: x1 = x2 = rX)
+      // x3 = m² - x1 - x2 = m² - 2*rX
+      const neg2RX = slope * slope - 2 * rX;
+      const neg2RY = slope * neg2RX + intercept;
+      
+      // Verify the point is on the curve
+      const neg2RYSquared = neg2RY * neg2RY;
+      const neg2RXCubedPlus7 = neg2RX * neg2RX * neg2RX + 7;
+      
+      if (Math.abs(neg2RYSquared - neg2RXCubedPlus7) > 0.1) continue;
+      
+      // 2R is the reflection of -2R across x-axis
+      const r2X = neg2RX;
+      const r2Y = -neg2RY;
+      
+      // Calculate how far 2R is from visible bounds
+      const r2XDist = Math.max(0, Math.max(xMinVisible - r2X, r2X - xMaxVisible));
+      const r2YDist = Math.max(0, Math.max(yMin - r2Y, r2Y - yMax));
+      const score = r2XDist + r2YDist;
+      
+      // If 2R is within bounds, use it immediately
+      if (score === 0) {
+        pointR = { x: rX, y: rY };
+        pointR2 = { x: r2X, y: r2Y };
+        pointNeg2R = { x: neg2RX, y: neg2RY };
+        
+        // Clear P+Q visualization
+        pointP = null;
+        pointQ = null;
+        pointNegR = null;
+        
+        drawCurve();
+        return;
+      }
+      
+      // Keep track of the best (closest to bounds) combination
+      if (score < bestScore) {
+        bestScore = score;
+        bestR = { x: rX, y: rY };
+        bestR2 = { x: r2X, y: r2Y };
+        bestNeg2R = { x: neg2RX, y: neg2RY };
+      }
+    }
+    
+    // Use the best combination found
+    if (bestR && bestR2 && bestNeg2R) {
+      pointR = bestR;
+      pointR2 = bestR2;
+      pointNeg2R = bestNeg2R;
+      
+      // Clear P+Q visualization
+      pointP = null;
+      pointQ = null;
+      pointNegR = null;
+    } else {
+      // Fallback: generate simple R
+      let rX = xMin + Math.random() * (xMax - xMin);
+      const rYSquared = rX * rX * rX + 7;
+      let rY = Math.sqrt(rYSquared);
+      if (Math.random() < 0.5) rY = -rY;
+      
+      if (Math.abs(rY) > 0.1) {
+        pointR = { x: rX, y: rY };
+        
+        const slope = (3 * rX * rX) / (2 * rY);
+        const intercept = rY - slope * rX;
+        const neg2RX = slope * slope - 2 * rX;
+        const neg2RY = slope * neg2RX + intercept;
+        
+        pointNeg2R = { x: neg2RX, y: neg2RY };
+        pointR2 = { x: neg2RX, y: -neg2RY };
+      }
+      
+      // Clear P+Q visualization
+      pointP = null;
+      pointQ = null;
+      pointNegR = null;
     }
     
     // Redraw curve with new points
@@ -488,12 +695,20 @@
       if (generateBtn) {
         generateBtn.addEventListener('click', generatePoints);
       }
+      const generateDoubleBtn = document.getElementById('generate-double-btn');
+      if (generateDoubleBtn) {
+        generateDoubleBtn.addEventListener('click', generateDouble);
+      }
     });
   } else {
     drawCurve();
     const generateBtn = document.getElementById('generate-points-btn');
     if (generateBtn) {
       generateBtn.addEventListener('click', generatePoints);
+    }
+    const generateDoubleBtn = document.getElementById('generate-double-btn');
+    if (generateDoubleBtn) {
+      generateDoubleBtn.addEventListener('click', generateDouble);
     }
   }
 

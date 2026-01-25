@@ -7,16 +7,28 @@ import BibItem from '@components/BibItem.astro'
 import Recommendations from '@components/Recommendations.astro'
 import SHA256Hash from '@components/SHA256Hash.astro'
 import Secp256k1Curve from '@components/Secp256k1Curve.astro'
+import Secp256k1KeyGen from '@components/Secp256k1KeyGen.astro'
 
-### Hashing
+Bitcoin es una moneda digital que catalizó la revolución de las criptomonedas. Fundada por Satoshi Nakamoto en 2009, es la primera criptomoneda exitosa y la más grande del mundo.
+
+## Objetivo
+
+La misión propuesta por Satoshi Nakamoto fue la de crear una moneda digital que no dependiera de ninguna autoridad central y que pudiera ser usada de forma descentralizada.
+
+Se busca reemplazar el modelo de sistema financiero actual, basado en la confianza, por uno basado en pruebas criptográficas.
+
+## Hashing
 
 Bitcoin utiliza el algoritmo de hashing SHA-256 para asegurar la integridad de la cadena de bloques.
 
-Las funciones de hashing son claves ya que permiten verificar la integridad de los datos sin necesidad de conocer los datos originales. Esto se debe a que el hash es una función unidireccional, es decir, que no se puede obtener el mensaje original a partir del hash.
+Las funciones de hashing son claves ya que permiten verificar que los datos no han sido modificados sin necesidad de conocer los datos originales. Esto se debe a dos razones:
+
+1. El hash es una función unidireccional, es decir, que no se puede obtener el mensaje original a partir del hash.
+2. Ante cualquier cambio, por pequeño que sea, el hash resultante será diferente, lo que permite detectar modificaciones.
 
 <SHA256Hash />
 
-### Criptografía de clave pública
+## Criptografía de clave pública
 
 Bitcoin utiliza la criptografía de clave pública (asimétrica) para asegurar la integridad de la cadena de bloques. Cada usuario tiene una clave pública y una clave privada. La clave pública se utiliza para verificar la integridad de los datos, mientras que la clave privada se utiliza para firmar los datos. 
 
@@ -42,11 +54,40 @@ n = 1157920892373161954235709850086879078528375642790749043826051631415181614943
 
 Esto significa que hay exactamente $n$ puntos en la curva **secp256k1**. Esto es fundamental para la seguridad del ECDSA ya que garantiza que las operaciones se realizan en un grupo de tamaño conocido y suficientemente grande.
 
-Una visualizacion de la curva **secp256k1** es la siguiente:
+Una visualizacion de la curva **secp256k1** y sus operaciones de suma de puntos y duplicación de punto es la siguiente:
 
 <Secp256k1Curve />
+
+En el caso de Bitcoin, se utiliza el punto base $G$ para generar la clave privada. Este punto es el siguiente:
+
+```math
+Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798\\
+Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+```
+### Generación de claves
+
+La clave privada es un número aleatorio entre 1 y $n-1$. Mientras que la clave pública es el punto $kG$. 
+
+Por ejemplo, si la clave privada es $k = 5$, la clave pública es $5G$. Para calcular la clave pública se pueden realizar las siguientes operaciones sobre la curva **secp256k1**:
+
+1. Comenzar a partir del punto base $G$
+2. Duplicar el punto base $G$ para obtener $2G$
+3. Duplicar el punto $2G$ para obtener $4G$
+4. Sumar el punto $4G$ al punto base $G$ para obtener $5G$
+
+Finalmente $5G$ es la clave pública, que es un punto en la curva **secp256k1**.
+
+Una visualización interactiva de este proceso se muestra a continuación:
+
+<Secp256k1KeyGen />
+
+La idea es que el usuario aún teniendo la clave publica (en este caso $5G$) y conocimiento del punto G (que es público) no pueda derivar la clave privada (en este caso $5$), siendo la única forma de hacerlo el método de fuerza bruta, que es inviable.
+
+
 
 ## Mas información
 
 <Recommendations />
 <BibItem id="bitcoin" rate="r" />
+<BibItem id="crypto_anarchist_manifesto" rate="o" />
+<BibItem id="b_money" rate="o" />

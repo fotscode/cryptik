@@ -1,0 +1,809 @@
+---
+---
+
+<div class="curve-container">
+  <div class="curve-header">
+    <h3 class="curve-title">Cálculo de 5G en secp256k1</h3>
+    <p class="curve-description">
+      Visualización del cálculo de la clave pública 5G a partir del punto base G, mostrando las operaciones de duplicación y suma de puntos.
+    </p>
+  </div>
+  <div class="curve-canvas-wrapper">
+    <canvas id="keygen-canvas" class="curve-canvas"></canvas>
+  </div>
+  <div class="curve-controls">
+    <button id="step-btn" class="generate-btn">Mostrar siguiente paso</button>
+    <button id="reset-btn" class="generate-btn">Reiniciar</button>
+  </div>
+  <div class="step-info">
+    <p id="step-description" class="step-text"></p>
+  </div>
+</div>
+
+<script>
+  // Points for the 5G calculation
+  let pointG: { x: number; y: number } | null = null;
+  let point2G: { x: number; y: number } | null = null;
+  let pointNeg2G: { x: number; y: number } | null = null;
+  let point4G: { x: number; y: number } | null = null;
+  let pointNeg4G: { x: number; y: number } | null = null;
+  let point5G: { x: number; y: number } | null = null;
+  let pointNeg5G: { x: number; y: number } | null = null;
+
+  let currentStep = 0; // 0: G, 1: 2G, 2: 4G, 3: 5G
+
+  // Find third intersection point of line with curve
+  function findThirdIntersection(x1: number, y1: number, x2: number, y2: number): { x: number; y: number } | null {
+    // Line equation: y = mx + b
+    let m: number;
+    let b: number;
+    
+    if (Math.abs(x1 - x2) < 0.001) {
+      // Points are the same or very close - use tangent
+      m = (3 * x1 * x1) / (2 * y1);
+      b = y1 - m * x1;
+    } else {
+      m = (y2 - y1) / (x2 - x1);
+      b = y1 - m * x1;
+    }
+
+    // Substitute y = mx + b into y² = x³ + 7
+    // (mx + b)² = x³ + 7
+    // m²x² + 2mbx + b² = x³ + 7
+    // x³ - m²x² - 2mbx - (b² - 7) = 0
+    
+    // We know x1 and x2 are roots, so we can factor:
+    // (x - x1)(x - x2)(x - x3) = 0
+    // Expanding: x³ - (x1+x2+x3)x² + (x1x2 + x1x3 + x2x3)x - x1x2x3 = 0
+    
+    // Comparing coefficients:
+    // -(x1+x2+x3) = -m²  =>  x1+x2+x3 = m²  =>  x3 = m² - x1 - x2
+    
+    const x3 = m * m - x1 - x2;
+    const y3 = m * x3 + b;
+    
+    // Verify the point is on the curve
+    const y3Squared = y3 * y3;
+    const x3CubedPlus7 = x3 * x3 * x3 + 7;
+    
+    if (Math.abs(y3Squared - x3CubedPlus7) > 0.1) {
+      return null;
+    }
+    
+    return { x: x3, y: y3 };
+  }
+
+  // Calculate all points from a given G point
+  function calculatePointsFromG(gX: number, gY: number): {
+    g: { x: number; y: number };
+    g2: { x: number; y: number } | null;
+    g4: { x: number; y: number } | null;
+    g5: { x: number; y: number } | null;
+  } {
+    // Calculate 2G (tangent at G)
+    const slope2G = (3 * gX * gX) / (2 * gY);
+    const intercept2G = gY - slope2G * gX;
+    const neg2GX = slope2G * slope2G - 2 * gX;
+    const neg2GY = slope2G * neg2GX + intercept2G;
+    const g2 = { x: neg2GX, y: -neg2GY };
+    
+    // Calculate 4G (tangent at 2G)
+    const slope4G = (3 * g2.x * g2.x) / (2 * g2.y);
+    const intercept4G = g2.y - slope4G * g2.x;
+    const neg4GX = slope4G * slope4G - 2 * g2.x;
+    const neg4GY = slope4G * neg4GX + intercept4G;
+    const g4 = { x: neg4GX, y: -neg4GY };
+    
+    // Calculate 5G (secant through 4G and G)
+    const neg5G = findThirdIntersection(g4.x, g4.y, gX, gY);
+    const g5 = neg5G ? { x: neg5G.x, y: -neg5G.y } : null;
+    
+    return {
+      g: { x: gX, y: gY },
+      g2,
+      g4,
+      g5
+    };
+  }
+
+  // Check if all points are within visible bounds
+  function areAllPointsVisible(points: {
+    g: { x: number; y: number };
+    g2: { x: number; y: number } | null;
+    g4: { x: number; y: number } | null;
+    g5: { x: number; y: number } | null;
+  }): boolean {
+    const bounds = { xMin: -5, xMax: 5, yMin: -5, yMax: 5 };
+    
+    const checkPoint = (p: { x: number; y: number } | null) => {
+      if (!p) return false;
+      return p.x >= bounds.xMin && p.x <= bounds.xMax &&
+             p.y >= bounds.yMin && p.y <= bounds.yMax;
+    };
+    
+    return checkPoint(points.g) && 
+           checkPoint(points.g2) && 
+           checkPoint(points.g4) && 
+           checkPoint(points.g5);
+  }
+
+  // Calculate a score for how spread out the points are
+  // Higher score = better spacing
+  function calculateSpacingScore(points: {
+    g: { x: number; y: number };
+    g2: { x: number; y: number } | null;
+    g4: { x: number; y: number } | null;
+    g5: { x: number; y: number } | null;
+  }): number {
+    if (!points.g2 || !points.g4 || !points.g5) return 0;
+    
+    const allPoints = [points.g, points.g2, points.g4, points.g5];
+    
+    // Calculate minimum distance between any two points
+    let minDistance = Infinity;
+    for (let i = 0; i < allPoints.length; i++) {
+      for (let j = i + 1; j < allPoints.length; j++) {
+        const dx = allPoints[i].x - allPoints[j].x;
+        const dy = allPoints[i].y - allPoints[j].y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        minDistance = Math.min(minDistance, distance);
+      }
+    }
+    
+    // Also calculate the spread (range) of x and y coordinates
+    const xs = allPoints.map(p => p.x);
+    const ys = allPoints.map(p => p.y);
+    const xSpread = Math.max(...xs) - Math.min(...xs);
+    const ySpread = Math.max(...ys) - Math.min(...ys);
+    
+    // Score combines minimum distance and overall spread
+    return minDistance * 0.5 + (xSpread + ySpread) * 0.5;
+  }
+
+  // Initialize G point - find one that keeps all points visible and well-spaced
+  function initializeG() {
+    const curveStartX = -Math.cbrt(7); // Approximately -1.913
+    const xMin = Math.max(curveStartX, -4.5);
+    const xMax = 2.5;
+    const yMax = 4.5;
+    
+    // Try different G points to find one where all points are visible and well-spaced
+    let bestG: { x: number; y: number } | null = null;
+    let bestPoints: any = null;
+    let bestScore = -1;
+    
+    // Try a wider range of candidate points with finer granularity
+    const candidates: number[] = [];
+    for (let x = xMin; x <= xMax; x += 0.1) {
+      candidates.push(x);
+    }
+    
+    // Evaluate all candidates and pick the one with best spacing
+    for (const candidateX of candidates) {
+      const ySquared = candidateX * candidateX * candidateX + 7;
+      if (ySquared < 0) continue;
+      
+      const y = Math.sqrt(ySquared);
+      if (y > yMax) continue;
+      
+      // Try positive y
+      const points = calculatePointsFromG(candidateX, y);
+      if (areAllPointsVisible(points)) {
+        const score = calculateSpacingScore(points);
+        if (score > bestScore) {
+          bestScore = score;
+          bestG = { x: candidateX, y: y };
+          bestPoints = points;
+        }
+      }
+      
+      // Try negative y
+      const pointsNeg = calculatePointsFromG(candidateX, -y);
+      if (areAllPointsVisible(pointsNeg)) {
+        const score = calculateSpacingScore(pointsNeg);
+        if (score > bestScore) {
+          bestScore = score;
+          bestG = { x: candidateX, y: -y };
+          bestPoints = pointsNeg;
+        }
+      }
+    }
+    
+    // If no candidate worked, try random points with spacing preference
+    if (!bestG || !areAllPointsVisible(bestPoints)) {
+      for (let attempt = 0; attempt < 2000; attempt++) {
+        // Try random x in valid range
+        const gX = xMin + Math.random() * (xMax - xMin);
+        const ySquared = gX * gX * gX + 7;
+        
+        if (ySquared < 0 || ySquared > yMax * yMax) continue;
+        
+        // Try both positive and negative y
+        for (const sign of [1, -1]) {
+          const gY = sign * Math.sqrt(ySquared);
+          if (Math.abs(gY) > yMax) continue;
+          
+          const points = calculatePointsFromG(gX, gY);
+          
+          if (areAllPointsVisible(points)) {
+            const score = calculateSpacingScore(points);
+            if (score > bestScore) {
+              bestScore = score;
+              bestG = { x: gX, y: gY };
+              bestPoints = points;
+            }
+          }
+          
+          // Keep track of the best one even if not perfect
+          if (!bestG) {
+            bestG = { x: gX, y: gY };
+            bestPoints = points;
+            bestScore = calculateSpacingScore(points);
+          }
+        }
+      }
+    }
+    
+    // Use the best G point found
+    if (bestG && bestPoints) {
+      pointG = bestPoints.g;
+      point2G = bestPoints.g2;
+      point4G = bestPoints.g4;
+      point5G = bestPoints.g5;
+      
+      // Calculate negative points for visualization
+      if (point2G && pointG) {
+        const slope2G = (3 * pointG.x * pointG.x) / (2 * pointG.y);
+        const intercept2G = pointG.y - slope2G * pointG.x;
+        const neg2GX = slope2G * slope2G - 2 * pointG.x;
+        const neg2GY = slope2G * neg2GX + intercept2G;
+        pointNeg2G = { x: neg2GX, y: neg2GY };
+      }
+      
+      if (point4G && point2G) {
+        const slope4G = (3 * point2G.x * point2G.x) / (2 * point2G.y);
+        const intercept4G = point2G.y - slope4G * point2G.x;
+        const neg4GX = slope4G * slope4G - 2 * point2G.x;
+        const neg4GY = slope4G * neg4GX + intercept4G;
+        pointNeg4G = { x: neg4GX, y: neg4GY };
+      }
+      
+      if (point5G && point4G && pointG) {
+        const neg5G = findThirdIntersection(point4G.x, point4G.y, pointG.x, pointG.y);
+        if (neg5G) {
+          pointNeg5G = neg5G;
+        }
+      }
+    } else {
+      // Fallback to a known good point
+      pointG = { x: 0.5, y: Math.sqrt(0.5 * 0.5 * 0.5 + 7) };
+      const points = calculatePointsFromG(pointG.x, pointG.y);
+      point2G = points.g2;
+      point4G = points.g4;
+      point5G = points.g5;
+      
+      if (point2G) {
+        const slope2G = (3 * pointG.x * pointG.x) / (2 * pointG.y);
+        const intercept2G = pointG.y - slope2G * pointG.x;
+        const neg2GX = slope2G * slope2G - 2 * pointG.x;
+        const neg2GY = slope2G * neg2GX + intercept2G;
+        pointNeg2G = { x: neg2GX, y: neg2GY };
+      }
+      
+      if (point4G && point2G) {
+        const slope4G = (3 * point2G.x * point2G.x) / (2 * point2G.y);
+        const intercept4G = point2G.y - slope4G * point2G.x;
+        const neg4GX = slope4G * slope4G - 2 * point2G.x;
+        const neg4GY = slope4G * neg4GX + intercept4G;
+        pointNeg4G = { x: neg4GX, y: neg4GY };
+      }
+      
+      if (point5G && point4G && pointG) {
+        const neg5G = findThirdIntersection(point4G.x, point4G.y, pointG.x, pointG.y);
+        if (neg5G) {
+          pointNeg5G = neg5G;
+        }
+      }
+    }
+    
+    currentStep = 0;
+    updateStepDescription();
+    drawCurve();
+  }
+
+  function updateStepDescription() {
+    const descEl = document.getElementById('step-description');
+    if (!descEl) return;
+    
+    const stepTexts = [
+      'Paso 1: Punto base G',
+      'Paso 2: Duplicar G para obtener 2G (tangente en G y reflexión)',
+      'Paso 3: Duplicar 2G para obtener 4G (tangente en 2G y reflexión)',
+      'Paso 4: Sumar 4G + G para obtener 5G (secante y reflexión)',
+      'Visualización completa: Todos los pasos mostrados'
+    ];
+    
+    descEl.textContent = stepTexts[Math.min(currentStep, stepTexts.length - 1)];
+  }
+
+  function drawCurve() {
+    const canvas = document.getElementById('keygen-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    const container = canvas.parentElement;
+    if (container) {
+      const width = container.clientWidth;
+      canvas.width = width;
+      canvas.height = Math.min(600, width * 0.75);
+    }
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 40;
+    const plotWidth = width - 2 * padding;
+    const plotHeight = height - 2 * padding;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Set styles
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const axisColor = isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+    const curveColor = getComputedStyle(document.documentElement).getPropertyValue('--sl-color-accent').trim() || '#5e6ad2';
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--sl-color-text').trim() || (isDark ? '#fff' : '#000');
+
+    // Draw grid
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (i / 10) * plotWidth;
+      const y = padding + (i / 10) * plotHeight;
+      ctx.beginPath();
+      ctx.moveTo(x, padding);
+      ctx.lineTo(x, height - padding);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(width - padding, y);
+      ctx.stroke();
+    }
+
+    // Draw axes
+    ctx.strokeStyle = axisColor;
+    ctx.lineWidth = 2;
+    const centerX = padding + plotWidth / 2;
+    const centerY = padding + plotHeight / 2;
+    
+    // X axis
+    ctx.beginPath();
+    ctx.moveTo(padding, centerY);
+    ctx.lineTo(width - padding, centerY);
+    ctx.stroke();
+    
+    // Y axis
+    ctx.beginPath();
+    ctx.moveTo(centerX, padding);
+    ctx.lineTo(centerX, height - padding);
+    ctx.stroke();
+
+    // Coordinate system: map from mathematical coordinates to canvas
+    const xMin = -5;
+    const xMax = 5;
+    const scaleX = plotWidth / (xMax - xMin);
+    const scaleY = plotHeight / 10; // Show y from -5 to 5
+
+    function mathToCanvasX(x: number): number {
+      return centerX + x * scaleX;
+    }
+
+    function mathToCanvasY(y: number): number {
+      return centerY - y * scaleY; // Invert y-axis
+    }
+
+    // Draw the curve y² = x³ + 7
+    ctx.strokeStyle = curveColor;
+    ctx.lineWidth = 3;
+    
+    const step = 0.005;
+    const curveStartX = -Math.cbrt(7); // Approximately -1.913
+    const startX = Math.max(xMin, curveStartX);
+    
+    // Calculate the meeting point where both branches connect (y = 0)
+    const meetingPointX = mathToCanvasX(curveStartX);
+    const meetingPointY = mathToCanvasY(0);
+    
+    // Draw upper branch (positive y)
+    ctx.beginPath();
+    ctx.moveTo(meetingPointX, meetingPointY);
+    for (let x = startX; x <= xMax; x += step) {
+      const ySquared = x * x * x + 7;
+      if (ySquared >= 0) {
+        const y = Math.sqrt(ySquared);
+        const canvasX = mathToCanvasX(x);
+        const canvasY = mathToCanvasY(y);
+        ctx.lineTo(canvasX, canvasY);
+      }
+    }
+    ctx.stroke();
+
+    // Draw lower branch (negative y)
+    ctx.beginPath();
+    ctx.moveTo(meetingPointX, meetingPointY);
+    for (let x = startX; x <= xMax; x += step) {
+      const ySquared = x * x * x + 7;
+      if (ySquared >= 0) {
+        const y = -Math.sqrt(ySquared);
+        const canvasX = mathToCanvasX(x);
+        const canvasY = mathToCanvasY(y);
+        ctx.lineTo(canvasX, canvasY);
+      }
+    }
+    ctx.stroke();
+
+    if (!pointG) return;
+
+    const gCanvasX = mathToCanvasX(pointG.x);
+    const gCanvasY = mathToCanvasY(pointG.y);
+
+    // Step 1: Draw G
+    if (currentStep >= 0) {
+      ctx.fillStyle = '#4a90e2';
+      ctx.beginPath();
+      ctx.arc(gCanvasX, gCanvasY, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('G', gCanvasX + 12, gCanvasY - 8);
+    }
+
+    // Step 2: Draw 2G (tangent at G)
+    if (currentStep >= 1 && point2G && pointNeg2G) {
+      const g2CanvasX = mathToCanvasX(point2G.x);
+      const g2CanvasY = mathToCanvasY(point2G.y);
+      const neg2GCanvasX = mathToCanvasX(pointNeg2G.x);
+      const neg2GCanvasY = mathToCanvasY(pointNeg2G.y);
+
+      // Draw tangent line at G
+      const slope2G = (3 * pointG.x * pointG.x) / (2 * pointG.y);
+      const intercept2G = pointG.y - slope2G * pointG.x;
+      
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const x1 = Math.min(pointG.x, pointNeg2G.x) - 2;
+      const x2 = Math.max(pointG.x, pointNeg2G.x) + 2;
+      const y1 = slope2G * x1 + intercept2G;
+      const y2 = slope2G * x2 + intercept2G;
+      ctx.moveTo(mathToCanvasX(x1), mathToCanvasY(y1));
+      ctx.lineTo(mathToCanvasX(x2), mathToCanvasY(y2));
+      ctx.stroke();
+
+      // Draw vertical line from -2G to 2G
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(neg2GCanvasX, neg2GCanvasY);
+      ctx.lineTo(g2CanvasX, g2CanvasY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw point -2G
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.arc(neg2GCanvasX, neg2GCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('-2G', neg2GCanvasX + 12, neg2GCanvasY - 8);
+
+      // Draw point 2G
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.arc(g2CanvasX, g2CanvasY, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('2G', g2CanvasX + 12, g2CanvasY + 8);
+    }
+
+    // Step 3: Draw 4G (tangent at 2G)
+    if (currentStep >= 2 && point4G && pointNeg4G && point2G) {
+      const g4CanvasX = mathToCanvasX(point4G.x);
+      const g4CanvasY = mathToCanvasY(point4G.y);
+      const neg4GCanvasX = mathToCanvasX(pointNeg4G.x);
+      const neg4GCanvasY = mathToCanvasY(pointNeg4G.y);
+
+      // Draw tangent line at 2G
+      const slope4G = (3 * point2G.x * point2G.x) / (2 * point2G.y);
+      const intercept4G = point2G.y - slope4G * point2G.x;
+      
+      ctx.strokeStyle = '#9b59b6';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const x1 = Math.min(point2G.x, pointNeg4G.x) - 2;
+      const x2 = Math.max(point2G.x, pointNeg4G.x) + 2;
+      const y1 = slope4G * x1 + intercept4G;
+      const y2 = slope4G * x2 + intercept4G;
+      ctx.moveTo(mathToCanvasX(x1), mathToCanvasY(y1));
+      ctx.lineTo(mathToCanvasX(x2), mathToCanvasY(y2));
+      ctx.stroke();
+
+      // Draw vertical line from -4G to 4G
+      ctx.strokeStyle = '#9b59b6';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(neg4GCanvasX, neg4GCanvasY);
+      ctx.lineTo(g4CanvasX, g4CanvasY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw point -4G
+      ctx.fillStyle = '#9b59b6';
+      ctx.beginPath();
+      ctx.arc(neg4GCanvasX, neg4GCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('-4G', neg4GCanvasX + 12, neg4GCanvasY - 8);
+
+      // Draw point 4G
+      ctx.fillStyle = '#9b59b6';
+      ctx.beginPath();
+      ctx.arc(g4CanvasX, g4CanvasY, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('4G', g4CanvasX + 12, g4CanvasY + 8);
+    }
+
+    // Step 4: Draw 5G (secant through 4G and G)
+    if (currentStep >= 3 && point5G && pointNeg5G && point4G) {
+      const g5CanvasX = mathToCanvasX(point5G.x);
+      const g5CanvasY = mathToCanvasY(point5G.y);
+      const neg5GCanvasX = mathToCanvasX(pointNeg5G.x);
+      const neg5GCanvasY = mathToCanvasY(pointNeg5G.y);
+      const g4CanvasX = mathToCanvasX(point4G.x);
+      const g4CanvasY = mathToCanvasY(point4G.y);
+
+      // Draw secant line through 4G and G
+      const slope5G = (pointG.y - point4G.y) / (pointG.x - point4G.x);
+      const intercept5G = pointG.y - slope5G * pointG.x;
+      
+      ctx.strokeStyle = '#27ae60';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const x1 = Math.min(pointG.x, point4G.x, pointNeg5G.x) - 2;
+      const x2 = Math.max(pointG.x, point4G.x, pointNeg5G.x) + 2;
+      const y1 = slope5G * x1 + intercept5G;
+      const y2 = slope5G * x2 + intercept5G;
+      ctx.moveTo(mathToCanvasX(x1), mathToCanvasY(y1));
+      ctx.lineTo(mathToCanvasX(x2), mathToCanvasY(y2));
+      ctx.stroke();
+
+      // Draw vertical line from -5G to 5G
+      ctx.strokeStyle = '#27ae60';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(neg5GCanvasX, neg5GCanvasY);
+      ctx.lineTo(g5CanvasX, g5CanvasY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw point -5G
+      ctx.fillStyle = '#27ae60';
+      ctx.beginPath();
+      ctx.arc(neg5GCanvasX, neg5GCanvasY, 7, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('-5G', neg5GCanvasX + 12, neg5GCanvasY - 8);
+
+      // Draw point 5G
+      ctx.fillStyle = '#27ae60';
+      ctx.beginPath();
+      ctx.arc(g5CanvasX, g5CanvasY, 8, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('5G', g5CanvasX + 12, g5CanvasY + 8);
+    }
+  }
+
+  function nextStep() {
+    if (currentStep < 4) {
+      currentStep++;
+      updateStepDescription();
+      drawCurve();
+    }
+  }
+
+  function reset() {
+    currentStep = 0;
+    updateStepDescription();
+    drawCurve();
+  }
+
+  // Initialize on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeG();
+      const stepBtn = document.getElementById('step-btn');
+      if (stepBtn) {
+        stepBtn.addEventListener('click', nextStep);
+      }
+      const resetBtn = document.getElementById('reset-btn');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', reset);
+      }
+    });
+  } else {
+    initializeG();
+    const stepBtn = document.getElementById('step-btn');
+    if (stepBtn) {
+      stepBtn.addEventListener('click', nextStep);
+    }
+    const resetBtn = document.getElementById('reset-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', reset);
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    setTimeout(drawCurve, 100);
+  });
+
+  // Redraw on theme change
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawCurve);
+  }
+</script>
+
+<style>
+  .curve-container {
+    padding: 1.5rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-bg-inset);
+    margin: 1rem 0;
+  }
+
+  .curve-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .curve-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--sl-color-text);
+  }
+
+  .curve-description {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--sl-color-text);
+    opacity: 0.8;
+    line-height: 1.5;
+  }
+
+  .curve-canvas-wrapper {
+    width: 100%;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-bg);
+    padding: 0.5rem;
+    overflow: hidden;
+  }
+
+  .curve-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 600px;
+  }
+
+  .curve-controls {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  @media (min-width: 600px) {
+    .curve-controls {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  .generate-btn {
+    padding: 0.75rem 1.5rem;
+    background-color: var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin: 0;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+    flex: 1;
+    min-width: 0;
+    flex-basis: 0;
+    height: 2.75rem;
+    line-height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .generate-btn:hover {
+    background-color: var(--sl-color-accent-high);
+    transform: translateY(-1px);
+  }
+
+  .generate-btn:active {
+    transform: translateY(0);
+  }
+
+  .step-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.375rem;
+    background-color: var(--sl-color-bg);
+  }
+
+  .step-text {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--sl-color-text);
+    font-weight: 500;
+  }
+</style>
+
