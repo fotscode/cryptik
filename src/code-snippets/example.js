@@ -1,3 +1,3 @@
-export const example_code=`
+export const example_code = `
 // code example
-`
+`;

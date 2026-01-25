@@ -1,13 +1,14 @@
 ---
-layout: '@layouts/math.astro'
+layout: "@layouts/math.astro"
 title: Bitcoin
 description: Bitcoin
 ---
-import BibItem from '@components/BibItem.astro'
-import Recommendations from '@components/Recommendations.astro'
-import SHA256Hash from '@components/SHA256Hash.astro'
-import Secp256k1Curve from '@components/Secp256k1Curve.astro'
-import Secp256k1KeyGen from '@components/Secp256k1KeyGen.astro'
+
+import BibItem from "@components/BibItem.astro";
+import Recommendations from "@components/Recommendations.astro";
+import SHA256Hash from "@components/SHA256Hash.astro";
+import Secp256k1Curve from "@components/Secp256k1Curve.astro";
+import Secp256k1KeyGen from "@components/Secp256k1KeyGen.astro";
 
 Bitcoin es una moneda digital que catalizó la revolución de las criptomonedas. Fundada por Satoshi Nakamoto en 2009, es la primera criptomoneda exitosa y la más grande del mundo.
 
@@ -30,7 +31,7 @@ Las funciones de hashing son claves ya que permiten verificar que los datos no h
 
 ## Criptografía de clave pública
 
-Bitcoin utiliza la criptografía de clave pública (asimétrica) para asegurar la integridad de la cadena de bloques. Cada usuario tiene una clave pública y una clave privada. La clave pública se utiliza para verificar la integridad de los datos, mientras que la clave privada se utiliza para firmar los datos. 
+Bitcoin utiliza la criptografía de clave pública (asimétrica) para asegurar la integridad de la cadena de bloques. Cada usuario tiene una clave pública y una clave privada. La clave pública se utiliza para verificar la integridad de los datos, mientras que la clave privada se utiliza para firmar los datos.
 
 Especificamente, Bitcoin utiliza el algoritmo de firma digital ECDSA (Elliptic Curve Digital Signature Algorithm) para este proposito con el algoritmo de curva secp256k1.
 
@@ -64,9 +65,10 @@ En el caso de Bitcoin, se utiliza el punto base $G$ para generar la clave privad
 Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798\\
 Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
 ```
+
 ### Generación de claves
 
-La clave privada es un número aleatorio entre 1 y $n-1$. Mientras que la clave pública es el punto $kG$. 
+La clave privada es un número aleatorio entre 1 y $n-1$. Mientras que la clave pública es el punto $kG$.
 
 Por ejemplo, si la clave privada es $k = 5$, la clave pública es $5G$. Para calcular la clave pública se pueden realizar las siguientes operaciones sobre la curva **secp256k1**:
 
@@ -82,8 +84,6 @@ Una visualización interactiva de este proceso se muestra a continuación:
 <Secp256k1KeyGen />
 
 La idea es que el usuario aún teniendo la clave publica (en este caso $5G$) y conocimiento del punto G (que es público) no pueda derivar la clave privada (en este caso $5$), siendo la única forma de hacerlo el método de fuerza bruta, que es inviable.
-
-
 
 ## Mas información
 
