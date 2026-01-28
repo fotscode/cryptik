@@ -2,6 +2,7 @@
   "name": "cryptik",
   "type": "module",
   "version": "0.0.1",
+  "packageManager": "bun@1.3.7",
   "scripts": {
     "dev": "astro dev",
     "private": "astro dev --host",

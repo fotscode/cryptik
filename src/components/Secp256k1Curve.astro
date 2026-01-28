@@ -105,14 +105,6 @@
       return centerY - y * scaleY; // Invert y-axis
     }
 
-    function canvasToMathX(canvasX: number): number {
-      return (canvasX - centerX) / scaleX;
-    }
-
-    function canvasToMathY(canvasY: number): number {
-      return (centerY - canvasY) / scaleY;
-    }
-
     // Draw the curve y² = x³ + 7
     // For each x, we have y = ±√(x³ + 7)
     // The curve exists where x³ + 7 ≥ 0, i.e., x ≥ -∛7 ≈ -1.913
@@ -195,7 +187,6 @@
       ctx.beginPath();
       
       // Extend line well beyond canvas bounds
-      const lineLength = Math.max(plotWidth, plotHeight) * 2;
       const x1 = Math.min(pX, qX, negRX) - 2;
       const x2 = Math.max(pX, qX, negRX) + 2;
       const y1 = slope * x1 + intercept;
